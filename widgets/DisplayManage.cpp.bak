@@ -1,0 +1,1376 @@
+/*************************************************************************
+Easy-Go Project 
+Author: Sureone Yang
+Email: EasyGo_Owner@yahoo.com
+------------------------------------------
+Revision History:
+2007-11-10			
+	V0.1 BaseLine
+2007-11-11			
+	1.  Add a new feature for supporting transparent wiget
+2007-11-14
+	1.  Fix the bug of draw transparent img, for each img should map to two mask, one mask for forground,
+		one mask for background, during draw, we first copy the img souce bmp into a temp DC, then mask it
+		with background mask , then 
+	2. Format Draw
+	
+		Format of mutil_bmp_draw_cmd
+		direction,num,x,y,w,h,repeat_num
+
+		direction = the dierction of draw , H means horizon, V mean vertical
+		num = the num of "x,y,w,h,repeat_num"
+		x = the x_offset in the resource bmp
+		y = the y_offset in the resource bmp
+		w = the width of bmp slot
+		h = the hight of bmp slot
+		repeat_num = draw repeat times
+2007-11-17
+	1.  Add a animate engine in charge of the animation management.
+	2.  增加了一个CFrameSurface, 该Surface只是个内存影像,每次绘图之前即(BeginPaint)须Create
+		一个FrameSurface,当绘图结束时候即(EndPaint)再将该FrameSurface添加到CDisplayManage管理的
+		FrameSurface列表。然后由AnimateEngine每隔一定的时间将FrameSurface列表BitBlt到实际
+		的屏幕CDC中，完成绘图的显示。	
+
+*************************************************************************/
+
+#include "DisplayManage.h"
+#include <vector>
+#include "memdc.h"
+
+
+CWidgetResource::~CWidgetResource()
+{
+#ifdef USE_CXIMAGE
+#else
+	CBitmap* bmp = (CBitmap*)(this->resource);
+	bmp->DeleteObject();
+	delete bmp;
+
+	if(this->bmp_mask1!=NULL)
+	{
+			CBitmap* bmp = (CBitmap*)(this->bmp_mask1);
+			bmp->DeleteObject();
+			delete bmp;
+
+	}
+	if(this->bmp_mask2!=NULL)
+	{
+			CBitmap* bmp = (CBitmap*)(this->bmp_mask2);
+			bmp->DeleteObject();
+			delete bmp;
+
+	}
+#endif
+}
+CWidgetResource* CDisplayManage::GetResource(char* res_id)
+{
+	for(int i=0;i<resource_db.size();i++)
+	{
+		if(resource_db[i]->isMe(res_id)==TRUE)
+		{
+			return resource_db[i];
+		}
+	}
+	return NULL;
+}
+CWidgetResource* CDisplayManage::AddResource(char* res_id,void* resource,void* bmp_mask1,void* bmp_mask2)
+{
+
+	CWidgetResource* p = new CWidgetResource(res_id,resource);
+	p->bmp_mask1=bmp_mask1;
+	p->bmp_mask2=bmp_mask2;
+	p->resource=resource;
+	resource_db.push_back(p);
+	return p;
+}
+
+
+#if 0
+{/*BEGIN*/
+  Uint32 c_white = SDL_MapRGB(screen->format, 255,255,255);
+  Uint32 c_gray = SDL_MapRGB(screen->format, 200,200,200);
+  Uint32 c_dgray= SDL_MapRGB(screen->format, 64,64,64);
+  Uint32 c_cyan = SDL_MapRGB(screen->format, 32,255,255);
+
+  //SDL_Rect r = {100,300,50,50};
+  //SDL_SetClipRect(screen, &r);  //Test of clipping code
+
+  
+  Draw_Line(screen, 100,100, 30,0, c_white);
+  Draw_Line(screen, 30,0, 100,100, c_white);
+
+  Draw_Line(screen, 100,100, 30,0, c_white);
+  Draw_Line(screen, 30,0, 100,100, c_white);
+  Draw_Line(screen, 0,0, 100,100, c_white);
+  Draw_Line(screen, 100,100, 300,200, c_white);
+  Draw_Line(screen, 200,300, 250,400,
+                SDL_MapRGB(screen->format, 128,128,255));
+  Draw_Line(screen, 500,50, 600,70,
+                SDL_MapRGB(screen->format, 128,255,128));
+  Draw_Line(screen, 500,50, 600,70,
+                SDL_MapRGB(screen->format, 128,255,128));
+  Draw_Circle(screen, 100,100, 50, c_white);
+
+  /*-------------*/
+  Draw_Circle(screen, 150,150, 5, c_white);
+  Draw_Circle(screen, 150,150, 4,
+                 SDL_MapRGB(screen->format, 64,64,64));
+  Draw_Circle(screen, 150,150, 3,
+                 SDL_MapRGB(screen->format, 255,0,0));
+  Draw_Circle(screen, 150,150, 2,
+                 SDL_MapRGB(screen->format, 0,255,0));
+  Draw_Circle(screen, 150,150, 1,
+                 SDL_MapRGB(screen->format, 0,0,255));
+  /*-------------*/
+
+  Draw_Line(screen, 500,100, 600,120,
+                SDL_MapRGB(screen->format, 128,255,128));
+  Draw_Circle(screen, 601,121, 2, c_white);
+
+  Draw_Circle(screen, 400,200, 2, c_white);
+  Draw_Line(screen, 400,200, 409,200, c_white);
+  Draw_Circle(screen, 409,200, 2, c_white);
+  Draw_Line(screen, 400,200, 400,250, c_white);
+  Draw_Circle(screen, 400,250, 2, c_white);
+  Draw_Line(screen, 409,200, 400,250, c_white);
+
+
+  Draw_Line(screen, 400,300, 409,300, c_gray);
+  Draw_Line(screen, 400,300, 400,350, c_gray);
+  Draw_Line(screen, 409,300, 400,350, c_dgray);
+  Draw_Rect(screen, 398,298, 4,4, c_cyan);
+  Draw_Rect(screen, 407,298, 4,4, c_cyan);
+  Draw_Rect(screen, 398,348, 4,4, c_cyan);
+
+  Draw_HLine(screen, 10,400, 50, c_white);
+  Draw_VLine(screen, 60,400, 360, c_white);
+  Draw_Rect(screen, 500,400, 50,50, c_white);
+  Draw_Pixel(screen, 510,410, c_white);
+  Draw_Pixel(screen, 520,420,
+             SDL_MapRGB(screen->format, 255,0,0));
+  Draw_Pixel(screen, 530,430,
+             SDL_MapRGB(screen->format, 0,255,0));
+  Draw_Pixel(screen, 540,440,
+             SDL_MapRGB(screen->format, 0,0,255));
+
+
+  Draw_Ellipse(screen, 100,300, 60,30, c_white);
+  
+  Draw_FillEllipse(screen, 300,300, 30,60,
+               SDL_MapRGB(screen->format, 64,64,200));
+  Draw_Ellipse(screen, 300,300, 30,60,
+               SDL_MapRGB(screen->format, 255,0,0));
+
+  Draw_Round(screen, 200,20, 70,50, 10, c_white);
+  Draw_Round(screen, 300,20, 70,50, 20,
+             SDL_MapRGB(screen->format, 255,0,0));
+  Draw_FillRound(screen, 390,20, 70,50, 20,
+                 SDL_MapRGB(screen->format, 255,0,0));
+  Draw_Round(screen, 390,20, 70,50, 20, c_cyan);
+
+  /*Draw_Round(screen, 500,400, 5,3, 4, c_cyan);*/
+
+  Draw_Rect(screen, 499,199, 52,72,
+            SDL_MapRGB(screen->format, 255,255,0));
+  Draw_FillRect(screen, 500,200, 50,70,
+                SDL_MapRGB(screen->format, 64,200,64));
+
+  Draw_FillCircle(screen, 500,330, 30, c_cyan);
+
+  SDL_UpdateRect(screen, 0, 0, 0, 0);
+#endif
+
+
+  void OUT_AREA_RECT(int& x1,int& y1,int& dx,int& dy,int h,int w) 
+  {
+
+	  int fx1=x1;
+	  int fy1=y1;
+	  h--;
+	  w--;
+
+	  int fx2=fx1+dx;
+	  int fy2=fy1+dy;
+
+
+	  	fx1=MAX(fx1,0);
+		fx2=MAX(fx2,0);
+		
+		fx1=MIN(fx1,w);
+		fx2=MIN(fx2,w);
+
+		fy1=MAX(fy1,0);
+		fy1=MIN(fy1,h);
+		fy2=MAX(fy2,0);
+		fy2=MIN(fy2,h);
+
+
+		dx=abs(fx2-fx1);
+		dy=abs(fy2-fy1);
+
+	  x1=fx1;
+	  y1=fy1;
+
+	//	dx=MIN(x1+dx,w-x1);
+	//	dy=MIN(x1+dy,h-y1);
+	  
+  }
+
+void OUT_AREA_LINE(int& x1,int& y1,int& x2,int& y2,int h,int w) 
+  {
+
+	float fx1=x1;
+	float fx2=x2;
+	float fy1=y1;
+	float fy2=y2;
+	float k,b;
+
+	float fx0,fxh,fy0,fyw;
+    h--;
+	w--;
+	//straight line
+
+	if(fx1==fx2 || fy1==fy2)
+	{
+		fx1=MAX(fx1,0);
+		fx2=MAX(fx2,0);
+		
+		fx1=MIN(fx1,w);
+		fx2=MIN(fx2,w);
+
+		fy1=MAX(fy1,0);
+		fy1=MIN(fy1,h);
+		fy2=MAX(fy2,0);
+		fy2=MIN(fy2,h);
+	}
+
+	
+	//xie xian
+	if(fx1!=fx2 && fy1!=fy2)
+	{
+		k=(fy2-fy1)/(fx1-fx2);
+		b=fy2-k*fx2;
+		fy0=b;
+		fyw=k*w+b;
+
+		fx0=(-b)/k;
+		fxh=(h-b)/k;
+
+		if(fx1<0)
+		{
+			fx1=0;
+			fy1=fy0;
+		}
+
+		if(fx2<0)
+		{
+			fx2=0;
+			fy2=fy0;
+		}
+
+		
+		if(fx1>w)
+		{
+			fx1=w;
+			fy1=fyw;
+		}
+
+		if(fx2>w)
+		{
+			fx2=0;
+			fy2=fyw;
+		}
+
+		if(fy1<0)
+		{
+			fy1=0;
+			fx1=fx0;
+		}
+
+		if(fy2<0)
+		{
+			fy2=0;
+			fx2=fx0;
+		}
+
+		if(fy1>h)
+		{
+			fy1=h;
+			fx1=fxh;
+		}
+
+		if(fy2>h)
+		{
+			fy2=h;
+			fx2=fxh;
+		}
+
+
+		
+
+	}
+
+
+	if(fx1<0 || fx2<0 || fy1<0 || fy2 <0)
+	{
+		fx1++;
+	}	
+	x1=fx1;
+	x2=fx2;
+	y1=fy1;
+	y2=fy2;
+
+  }
+
+
+extern "C" int __stdcall DrawHTML(
+                       HDC     hdc,        // handle of device context
+                       LPCTSTR lpString,   // address of string to draw
+                       int     nCount,     // string length, in characters
+                       LPRECT  lpRect,     // address of structure with formatting dimensions
+                       UINT    uFormat     // text-drawing flags
+					   );
+
+CDisplayManage* g_pDisplayManage=NULL;
+void RefreshScreenSurface()
+{
+	if(g_pDisplayManage==NULL) return;
+	g_pDisplayManage->FlushSurface();
+}
+void DisplayAddSurface(CFrameSurface* pSurface)
+{
+	if(g_pDisplayManage==NULL) return;
+	g_pDisplayManage->AddFrameSurface(pSurface);
+	
+}
+CDisplayManage::CDisplayManage(void)
+{
+}
+CDisplayManage::CDisplayManage(HWND hWnd)
+
+{
+
+
+
+		//Create the Font
+	LOGFONT lf = {0};
+	lf.lfHeight = -11;
+	lf.lfWeight = FW_NORMAL;
+	
+	_tcscpy(lf.lfFaceName,"Tahoma");
+	m_font.CreateFontIndirect(&lf);
+	m_pHeadOfFrameSurfaces=NULL;
+	m_pTailOfFrameSurfaces=NULL;
+	m_nFrameSurfaces=0;
+	::InitializeCriticalSection(&m_CriticalSection);
+
+		g_pDisplayManage=this;
+		CDC* pDC=new CDC();
+		pDC->Attach(GetWindowDC(hWnd));
+
+		m_pScreen=pDC;
+		m_pScreen->SelectObject(&m_font);
+	
+	
+}
+
+CDisplayManage::~CDisplayManage(void)
+
+{
+	g_pDisplayManage=NULL;
+
+	for(int i=0;i<resource_db.size();i++)
+	{
+		delete resource_db[i];		
+	}
+
+}
+	void CFrameSurface::DrawText(LPCTSTR lpString,   // address of string to draw
+                       int     nCount,     // string length, in characters
+                       WRect* pRc,     // address of structure with formatting dimensions
+                       UINT    uFormat     // text-drawing flags
+					   )
+	{
+				CDC* screen=GetScreenCDC();
+				CRect rc;
+				WRECT_TO_CRECT(pRc,(&rc));
+				DrawHTML(
+                      screen->m_hDC ,        // handle of device context
+                        lpString,   // address of string to draw
+                            nCount,     // string length, in characters
+                         (LPRECT)(&rc),     // address of structure with formatting dimensions
+                           uFormat     // text-drawing flags
+					   );
+	}
+
+void CDisplayManage::GetClipRect(  WRect* rc){
+	CFrameSurface* pSurface = this->GetCurFrameSurface();
+	pSurface->GetClipRect(rc);
+};
+
+void CDisplayManage::SetClipRect( WRect* rc){
+	CFrameSurface* pSurface = this->GetCurFrameSurface();
+	pSurface->SetClipRect(rc);
+};
+void CFrameSurface::GetClipRect(  WRect* rc){
+	CLONE_RECT(&m_clipRect,rc);
+};
+
+void CFrameSurface::SetClipRect( WRect* rc){
+	CLONE_RECT(rc,&m_clipRect);
+};
+
+CDC* CFrameSurface::GetScreenCDC ( )
+{
+	if( m_bMemoryDraw == true )
+	{
+		//m_pMemoryDrawCDC->SelectObject(&m_font);		
+		return m_pMemoryDrawCDC ;
+	}
+	return m_pCDC;
+}
+
+//#define DISABLE_MEM_DC
+CFrameSurface* CDisplayManage::BeginPaint(WRect* pPaintRc)
+{
+			CFrameSurface* pSurface=CreateNewOfflineSurface(pPaintRc);
+			pSurface->BeginPaint();
+			return pSurface;
+
+}
+void CDisplayManage::EndPaint(CFrameSurface* pSurface)
+{		
+		
+		pSurface->EndPaint();
+		this->AddFrameSurface(pSurface);
+}
+
+
+CMemoryFrameSurface* CDisplayManage::BeginMemoryPaint(WRect* pPaintRc)
+{
+			CMemoryFrameSurface* pSurface=CreateNewMemorySurface(pPaintRc);
+			pSurface->BeginPaint();
+			return pSurface;
+
+}
+void CDisplayManage::EndMemoryPaint(CMemoryFrameSurface* pSurface)
+{		
+		pSurface->EndPaint();
+		this->AddFrameSurface(pSurface);
+}
+
+
+#ifdef USE_CDC
+
+
+#endif
+	int CFrameSurface::MoveTo(int x, int y)
+	{
+		ptOld.x=x;
+		ptOld.y=y;
+#ifdef USE_CDC
+		CDC* screen=GetScreenCDC();
+		screen->MoveTo(x,y);
+#endif
+		return 0;
+	}
+
+
+	int CFrameSurface::LineTo(int xo, int yo,int color)
+	{
+#ifdef USE_SDL
+		
+		SDL_Surface* screen=GetScreenCDC();
+		int c=SDL_MapRGB(screen->format, (color>>16)&0xFF,(color>>8)&0xFF,(color)&0xFF);
+#endif
+#ifdef USE_CDC
+		CDC* screen=GetScreenCDC();
+		//int c=SDL_MapRGB(screen->format, (color>>16)&0xFF,(color>>8)&0xFF,(color)&0xFF);
+#endif
+	    int oldx=ptOld.x;
+		int oldy=ptOld.y;
+		int x=xo;
+		int y=yo;
+#ifdef USE_SDL		
+		OUT_AREA_LINE(x,y,oldx,oldy,height,width);
+		Draw_Line(screen, oldx,oldy,x,y, c);
+	#endif
+
+#ifdef USE_CDC
+		CPen pen;
+		pen.CreatePen(PS_SOLID,1,color);
+		CPen* oldpen=screen->SelectObject(&pen);
+		screen->MoveTo(oldx,oldy);
+		screen->LineTo(x,y);
+		screen->SelectObject(oldpen);
+		pen.DeleteObject();
+#endif
+		WRect rc;
+		rc.x=MIN(oldx,x);
+		rc.y=MIN(oldy,y);
+		rc.dx=MAX(oldx,x)-MIN(oldx,x)+1;
+		rc.dy=MAX(oldy,y)-MIN(oldy,y)+1;		
+		AddDirtyRect(&rc);
+
+	    
+		ptOld.x=xo;
+		ptOld.y=yo;
+		return 0;
+	}
+
+	int CFrameSurface::FillRect(WRect* pRect, int color)
+	{
+#ifdef USE_SDL
+			SDL_Surface* screen=GetScreenCDC();			
+					int c=SDL_MapRGB(screen->format, (color>>16)&0xFF,(color>>8)&0xFF,(color)&0xFF);		
+#endif
+		
+
+#ifdef USE_CDC
+			CDC* screen=GetScreenCDC();	
+#endif
+
+		int x1=pRect->x;
+		int y1=pRect->y;
+		int dx=pRect->dx;
+		int dy=pRect->dy;
+
+#ifdef USE_SDL
+		OUT_AREA_RECT(x1,y1,dx,dy,height,width);
+		Draw_FillRect(screen, x1,y1,dx,dy,c);
+#endif
+#ifdef USE_CDC		
+		screen->FillSolidRect(x1,y1,dx,dy,color);
+#endif
+
+		
+	
+		WRect rc;
+		rc.x=x1;
+		rc.y=y1;
+		rc.dx=dx;
+		rc.dy=dy;
+		//WRECT_TO_SDLRECT((*pRect),rc);
+	   AddDirtyRect(&rc);
+
+		return 0;
+	}
+
+	/*
+		Format of mutil_bmp_draw_cmd
+		direction,num,x,y,w,h,repeat_num
+
+		direction = the dierction of draw , H means horizon, V mean vertical
+		num = the num of "x,y,w,h,repeat_num"
+		x = the x_offset in the resource bmp
+		y = the y_offset in the resource bmp
+		w = the width of bmp slot
+		h = the hight of bmp slot
+	*/
+	typedef struct{
+		int x;
+		int y;
+		int w;
+		int h;
+		int repeat_num;
+	}BATCH_BMP_DRAW_CMD;
+
+	void CFrameSurface::DrawImage(IMAGE_HANDLE handle,WRect* pFullImageRect,bool reverse,char* batch_bmp_draw_cmd)
+	{
+		
+		WRect drawRc;
+		WRect clipRc;
+		WRect fullRc;
+		CLONE_RECT(pFullImageRect,(&fullRc));
+
+		GetClipRect(&clipRc);
+		
+		if(IntersectRect(&drawRc,&fullRc,&clipRc)==false)
+		{
+			return;
+		}
+
+		
+		int num_cmd;
+		char draw_direction;				
+		char value[16];
+		memset(value,0,sizeof(value));
+		char* p1=batch_bmp_draw_cmd+2;
+		char* p2=NULL;
+
+		bool bTransparent=false;
+		if(strstr(batch_bmp_draw_cmd,"BMP_MASK:")>0)
+		{
+			bTransparent=true;
+		}
+
+		draw_direction=batch_bmp_draw_cmd[0];	
+		p2= strchr(p1,',');
+		strncpy(value,p1,(p2-p1));
+		num_cmd=atoi(value);
+		
+	
+		
+		if(num_cmd>0)
+		{
+			int i =0;
+
+			while(i<num_cmd)
+			{
+				BATCH_BMP_DRAW_CMD cmd;
+				//get x
+				p1=p2+1;
+				p2=	strchr(p1,',');
+				memset(value,0,sizeof(value));
+				strncpy(value,p1,(p2-p1));
+				cmd.x=atoi(value);
+
+				//get y
+				p1=p2+1;
+				p2=	strchr(p1,',');
+				memset(value,0,sizeof(value));
+				strncpy(value,p1,(p2-p1));
+				cmd.y=atoi(value);
+
+				//get w
+				p1=p2+1;
+				p2=	strchr(p1,',');
+				memset(value,0,sizeof(value));
+				strncpy(value,p1,(p2-p1));
+				cmd.w=atoi(value);
+
+				//get h
+				p1=p2+1;
+				p2=	strchr(p1,',');
+				memset(value,0,sizeof(value));
+				strncpy(value,p1,(p2-p1));
+				cmd.h=atoi(value);
+
+				//get repeat_num
+				p1=p2+1;
+				p2=	strchr(p1,',');
+				memset(value,0,sizeof(value));
+				strncpy(value,p1,(p2-p1));
+				cmd.repeat_num=atoi(value);
+
+				while(cmd.repeat_num>0)
+				{
+					
+					fullRc.dx=cmd.w;
+					fullRc.dy=cmd.h;
+
+					WRect curRc;
+
+					if(IntersectRect(&curRc,&fullRc,&drawRc)==true)
+					{
+						DrawImage( handle,&fullRc,&curRc,bTransparent,reverse,cmd.x,cmd.y,cmd.w,cmd.h);
+					}
+					 if(draw_direction=='H')
+						fullRc.x+=cmd.w;					
+					if(draw_direction=='V')
+						fullRc.y+=cmd.h;
+					 cmd.repeat_num--;
+
+				}
+				i++;
+			}
+		}	
+	}
+
+	// Frame Surface 的Size与Clip Rect一样大也就是以Clip Rect的左上点为坐标原点
+	// 
+	void CFrameSurface::DrawImage(IMAGE_HANDLE handle,WRect* fullRc,WRect* inClipRc,bool bTransparent,bool reverse,int x,int y, int w,int h)
+	{
+		static int cntDraw=0;
+
+		CDC* screen=GetScreenCDC();
+
+		CWidgetResource* resource=(CWidgetResource*)(handle);
+		CBitmap* imgBmp=(CBitmap*)(resource->resource );
+		CBitmap* maskBmp1=(CBitmap*)(resource->bmp_mask1);
+				
+		WRect surfaceRect;
+	
+		this->GetRect(&surfaceRect);
+
+		int offset_x=MAX(fullRc->x,inClipRc->x)-MIN(fullRc->x,inClipRc->x);
+		int offset_y=MAX(fullRc->y,inClipRc->y)-MIN(fullRc->y,inClipRc->y);
+
+		//转换坐标，以Surface Rect 的左上为原点
+		int ox = inClipRc->x;
+		int oy = inClipRc->y;
+
+		this->ScreenToSuface(ox,oy,screen);
+
+
+
+
+		CDC* targetCDC=screen;
+			
+		if(bTransparent==FALSE)
+		{
+				CDC bmDC;
+				bmDC.CreateCompatibleDC(targetCDC);
+				CBitmap *pOldbmp = bmDC.SelectObject(imgBmp);
+				targetCDC->BitBlt(ox,oy,inClipRc->dx,inClipRc->dy,&bmDC,x+offset_x,y+offset_y,SRCCOPY);
+			//	targetCDC->SelectObject(pOldbmp);
+				bmDC.DeleteDC();
+		}
+		else
+		{
+				CDC bmDC;
+				bmDC.CreateCompatibleDC(m_pScreen);
+
+				CDC maskDC;
+				maskDC.CreateCompatibleDC(m_pScreen);
+			
+				CBitmap *pOldbmp = bmDC.SelectObject(imgBmp);
+				maskDC.SelectObject(maskBmp1);
+						
+				CDC tempDC;
+				tempDC.CreateCompatibleDC(m_pScreen);
+
+				CBitmap pTempBmp;
+				pTempBmp.CreateCompatibleBitmap(m_pScreen,w,h);
+				tempDC.SelectObject(&pTempBmp);	
+
+				pOldbmp = bmDC.SelectObject(imgBmp);
+
+				//copy source bmp to tempDC
+				tempDC.BitBlt(0,0,w,h,&bmDC,x,y,SRCCOPY);
+				
+				//check if mask2 exist
+				CBitmap* maskBmp2=(CBitmap*)(resource->bmp_mask2);
+				if(maskBmp2!=NULL)
+				{
+						CDC maskDC2;
+						maskDC2.CreateCompatibleDC(m_pScreen);				
+						maskDC2.SelectObject(maskBmp2);
+
+						//AND source bmp and mask2 bmp to hide background
+						tempDC.BitBlt(0,0,w,h,&maskDC2,0,0,SRCAND);
+						maskDC2.DeleteDC();
+				}
+
+
+				//copy Screen
+				targetCDC->BitBlt(ox,oy,inClipRc->dx,inClipRc->dy,m_pScreen,inClipRc->x,inClipRc->y,SRCCOPY);
+				//screen AND mask
+				targetCDC->BitBlt(ox,oy,inClipRc->dx,inClipRc->dy,&maskDC,offset_x,offset_y,SRCAND);
+				//(screen AND mask) OR bmp
+				targetCDC->BitBlt(ox,oy,inClipRc->dx,inClipRc->dy,&tempDC,offset_x,offset_y,SRCPAINT);	
+			
+				bmDC.DeleteDC();
+				maskDC.DeleteDC();
+				tempDC.DeleteDC();
+			
+		}
+
+		cntDraw++;
+
+		AddDirtyRect(inClipRc);
+	}
+
+
+	/* draw_cmd format
+		BMP_MASK:num:x,y,w,h,
+	*/
+	IMAGE_HANDLE CDisplayManage::LoadImage(char* fn,char* draw_cmd)
+	{
+		IMAGE_HANDLE imgHandle;
+
+			CWidgetResource* p=this->GetResource(fn);
+		
+			if(p==NULL)
+			{
+				
+				HBITMAP hBmp = (HBITMAP)::LoadImage(NULL,fn,
+								IMAGE_BITMAP,0,0,
+								LR_LOADFROMFILE|LR_CREATEDIBSECTION);
+
+				CBitmap* bmp = new CBitmap();
+				bmp->Attach(hBmp);
+
+				p = this->AddResource(fn,bmp,NULL,NULL);
+				p->bmp_mask1=NULL;
+				p->bmp_mask2=NULL;
+
+				BITMAP bm;
+				bmp->GetObject(sizeof(BITMAP),&bm);
+				p->h=bm.bmHeight;
+				p->w=bm.bmWidth;
+
+			int mask_num;
+			bool bMaskLoad = false;
+					
+			char value[16];
+			int mask_x,mask_y,mask_w,mask_h;
+			
+			char* p1=strstr(draw_cmd,"BMP_MASK:");
+			
+
+				if(p1>0)
+				{
+					p1+=strlen("BMP_MASK:");
+					
+					bMaskLoad=true;
+
+					char* p2=NULL;
+
+					memset(value,0,sizeof(value));
+					p2= strchr(p1,',');
+					strncpy(value,p1,(p2-p1));
+					mask_num=atoi(value);
+
+					int cnt_mask=0;
+
+					while(cnt_mask<mask_num)
+					{
+						p1=p2+1;
+						memset(value,0,sizeof(value));
+						p2= strchr(p1,',');
+						strncpy(value,p1,(p2-p1));
+						mask_x=atoi(value);
+
+						p1=p2+1;
+						memset(value,0,sizeof(value));
+						p2= strchr(p1,',');
+						strncpy(value,p1,(p2-p1));
+						mask_y=atoi(value);
+
+						p1=p2+1;
+						memset(value,0,sizeof(value));
+						p2= strchr(p1,',');
+						strncpy(value,p1,(p2-p1));
+						mask_w=atoi(value);
+
+						p1=p2+1;
+						memset(value,0,sizeof(value));
+						p2= strchr(p1,',');
+						strncpy(value,p1,(p2-p1));
+						mask_h=atoi(value);
+
+
+						CDC dcSrc;
+						CDC dcMask;
+						CBitmap* maskBmp = new CBitmap();
+						maskBmp->CreateCompatibleBitmap(m_pScreen,mask_w,mask_h);
+						dcSrc.CreateCompatibleDC(m_pScreen);
+						dcMask.CreateCompatibleDC(m_pScreen);
+						dcSrc.SelectObject(bmp);
+						dcMask.SelectObject(maskBmp);
+						dcMask.BitBlt(0,0,mask_w,mask_h,&dcSrc,mask_x,mask_y,SRCCOPY);
+						if(cnt_mask==0)
+							p->bmp_mask1=maskBmp;
+						else
+							p->bmp_mask2=maskBmp;
+
+						dcSrc.DeleteDC();
+						dcMask.DeleteDC();		
+
+
+						cnt_mask++;
+					}
+				}		
+			}	
+			return (IMAGE_HANDLE)p;
+
+	}
+
+
+	
+CMemBitmap* CFrameSurface::NewMemBitmap(int w,int h)
+{
+
+#ifdef USE_CDC
+	CMemBitmap* pBmp = new CMemBitmap();
+	CBitmap* bmp= new CBitmap();
+	bmp->CreateCompatibleBitmap(m_pScreen,w, h);
+	pBmp->bitmap_data=bmp;
+	pBmp->m_rect.dx=w;
+	pBmp->m_rect.dy=h;
+
+//	pBmp->m_pCDC->SelectObject(bmp);
+	return pBmp;
+#endif
+	return 0;
+}
+
+
+CMemBitmap* CFrameSurface::GetMemBitmap(WRect* pRect)
+{
+	CMemBitmap* pNewBmp = new CMemBitmap();
+#ifdef USE_CDC
+
+	CDC* screen= CFrameSurface::GetScreenCDC();
+
+	pNewBmp->m_pCDC->CreateCompatibleDC(screen);
+	CBitmap* bmp = (CBitmap*)pNewBmp->bitmap_data;
+	bmp->CreateCompatibleBitmap(screen,pRect->dx,pRect->dy);
+	pNewBmp->bitmap_data=bmp;
+	//pNewBmp->m_rect=*pRect;
+	CLONE_RECT(pRect,&(pNewBmp->m_rect));
+	pNewBmp->m_pCDC->SelectObject(bmp);
+	pNewBmp->m_pCDC->BitBlt(
+		0,
+		0,
+		pNewBmp->m_rect.dx,
+		pNewBmp->m_rect.dy,
+		screen,
+		pNewBmp->m_rect.x,pNewBmp->m_rect.y,SRCCOPY
+		);
+	//pNewBmp->m_pCDC->DeleteDC();
+
+
+	return pNewBmp;
+#endif
+	
+}
+
+	void CFrameSurface::BeginDrawInMemory()
+	{
+		m_pMemoryDrawCDC = new CDC();
+		m_pMemoryDrawBitmap = new CBitmap();
+		m_bMemoryDraw=TRUE;
+
+		WRect rcClip;
+		GetClipRect(&rcClip);
+		CRect m_rect;
+
+		WRECT_TO_CRECT(&rcClip,&m_rect);
+		m_pMemoryDrawCDC->CreateCompatibleDC(m_pScreen);
+		m_pMemoryDrawBitmap->CreateCompatibleBitmap(m_pScreen, m_rect.Width(), m_rect.Height());
+		m_pMemoryDrawCDC->SelectObject(m_pMemoryDrawBitmap);
+		
+			m_pMemoryDrawCDC->SetWindowOrg(m_rect.left, m_rect.top);
+
+			//copy background
+			//m_pMemoryDrawCDC->SetBkMode(TRANSPARENT);
+	
+	}
+	void CFrameSurface::EndDrawInMemory()
+	{
+		m_bMemoryDraw=FALSE;		
+		m_pMemoryDrawCDC->DeleteDC();
+		m_pMemoryDrawBitmap->DeleteObject();
+		delete m_pMemoryDrawCDC;
+		delete m_pMemoryDrawBitmap;
+	}
+void CFrameSurface::BitBlt(CMemBitmap* pMemBmp,WRect* rcDraw)
+{
+	static int cntDraw=0;
+
+
+	CDC* screen=GetScreenCDC();
+
+	WRect rcOut;
+	WRect rcClient;
+	if(IntersectRect(&rcOut,rcDraw,&(pMemBmp->m_rect))==TRUE)
+	{
+		rcClient.x=rcOut.x-pMemBmp->m_rect.x;
+		rcClient.y=rcOut.y-pMemBmp->m_rect.y;
+		rcClient.dx=rcOut.dx;
+		rcClient.dy=rcOut.dy;
+	}
+	else
+	{
+		return;
+	}
+
+	if(pMemBmp->m_nAlphaValue <255)
+	{
+			BLENDFUNCTION m_bf;	
+			m_bf.BlendOp = AC_SRC_OVER;
+				m_bf.BlendFlags = 0;
+				m_bf.SourceConstantAlpha = 0;
+				m_bf.AlphaFormat = 0 ;
+			m_bf.SourceConstantAlpha = pMemBmp->m_nAlphaValue;
+			screen->AlphaBlend(
+				rcOut.x,rcOut.y,rcOut.dx,rcOut.dy,
+				pMemBmp->m_pCDC,
+				
+				rcClient.x,rcClient.y,rcClient.dx,rcClient.dy,
+				m_bf);
+	}
+	else
+	{
+	screen->BitBlt(rcOut.x,rcOut.y,rcOut.dx,rcOut.dy,
+		pMemBmp->m_pCDC,
+		rcClient.x,rcClient.y,SRCCOPY);
+
+	}
+
+						cntDraw++;
+
+			//	TRACE("DisplayBitBlt Draw=%d\n",cntDraw);
+
+	   AddDirtyRect(&rcOut);
+
+
+
+}
+
+CFrameSurface::CFrameSurface(CDC* pDC,CDirtyTable* dirtyTable,CBitmap* pBmp)
+	{
+		m_pDirtyTable= dirtyTable;
+		this->m_pBitmap=pBmp;
+		this->m_pCDC=pDC;
+		m_pNext=NULL;
+		m_pPrev=NULL;
+		m_bFinishPaint=false;
+		ptOld.x=0;
+		ptOld.y=0;
+		
+		m_bOffScreenDraw=false;
+		m_bMemoryDraw=false;
+		
+		m_pCurMemBitmap=0;
+		m_pScreen=NULL;
+		m_bMemorySurface=false;
+		m_nBitBltXOffset =0 ;
+		m_nBitBltYOffset =0;
+		m_bDestroy=false;
+		m_bRemove=false;
+		m_nAlpha=255;
+		 m_pBmpScreenBackup=NULL;
+		 m_pCDCScreenBackup=NULL;
+
+	}
+CFrameSurface::~CFrameSurface()
+	{
+		m_pCDC->DeleteDC();
+		m_pBitmap->DeleteObject();
+		delete m_pCDC;
+		delete m_pBitmap;
+		delete m_pDirtyTable;
+
+	}
+
+	bool CFrameSurface::GetBackupScreen(CDC* &pDC,WRect* pRect)
+	{
+		if(m_pCDCScreenBackup==NULL) return false;
+		pDC= m_pCDCScreenBackup;
+		CLONE_RECT((&m_rcScreenBackUp),(pRect));
+		return true;
+	}
+	 CDC* CFrameSurface::BackUpScreen(WRect* pRect, bool& bBackuped)
+	{
+		
+		if(m_pBmpScreenBackup!=NULL)
+		{
+			bBackuped=true;
+			return m_pCDCScreenBackup; 
+			m_pBmpScreenBackup->DeleteObject();
+			delete m_pBmpScreenBackup;
+		
+
+		}
+		if(m_pCDCScreenBackup!=NULL)
+		{
+			m_pCDCScreenBackup->DeleteDC();
+			delete m_pCDCScreenBackup;
+		}
+		CLONE_RECT((pRect),(&m_rcScreenBackUp));
+		m_pCDCScreenBackup = new CDC();
+		m_pBmpScreenBackup= new CBitmap();
+
+
+		m_pCDCScreenBackup->CreateCompatibleDC(m_pScreen);
+		m_pBmpScreenBackup->CreateCompatibleBitmap(m_pScreen,m_rcScreenBackUp.dx,m_rcScreenBackUp.dy);
+		m_pCDCScreenBackup->SelectObject(m_pBmpScreenBackup);
+		m_pCDCScreenBackup->BitBlt(0,0,pRect->dx,pRect->dy,m_pScreen,pRect->x,pRect->y,SRCCOPY);
+		bBackuped=false;
+		return m_pCDCScreenBackup;
+	}
+
+	 void CFrameSurface::RemoveBackGroundDirtyRect()
+	{
+		if(m_pDirtyTable->m_pHeadOfRects->IsPlusOffset()==false)
+		{
+			m_pDirtyTable->Remove(m_pDirtyTable->m_pHeadOfRects);
+		}
+
+	}
+	void CFrameSurface::AddDirtyRect(WRect* pRect,int nAlpha,CDC* pDC,bool bHead,bool bPlusOffset)
+	{
+		SDL_Rect* rc= new SDL_Rect();
+		WRECT_TO_SDLRECT((*pRect),(*rc));
+		rc->nAlpha = nAlpha;
+		rc->pDC=pDC;
+		rc->m_bPlusOffset=bPlusOffset;
+		
+		if(nAlpha==-1)
+		{
+			rc->nAlpha=GetAlpha();
+		}
+		if(pDC==NULL)
+		{
+			rc->pDC=this->GetScreenCDC();
+		}		
+		if(bHead==true)
+		{
+			this->m_pDirtyTable->AddToHead(rc);
+		}
+		else
+		{
+			this->m_pDirtyTable->Add(rc);
+		}
+	}
+
+
+
+
+
+	CMemoryFrameSurface* CreateNewMemorySurface(WRect* pSurfaceRc)
+	{
+		 DWORD  curThreadId = GetCurrentThreadId();
+		TRACE("Current Thread ID = %d\n", curThreadId);
+		CDC* pDC = new CDC();
+		CBitmap* pBmp = new CBitmap();
+		CDirtyTable* pDirtyTable =new CDirtyTable(DIRTY_TABLE_SIZE);								
+		pDirtyTable->Clear();
+
+		pDC->CreateCompatibleDC(m_pScreen);
+		//m_pScreen->LPtoDP(&m_rect);
+		pBmp->CreateCompatibleBitmap(m_pScreen, pSurfaceRc->dx,pSurfaceRc->dy);
+		pDC->SelectObject(pBmp);
+		//pDC->SetWindowOrg(pSurfaceRc->x,pSurfaceRc->y);
+		pDC->SetBkMode(TRANSPARENT);			
+
+		CMemoryFrameSurface * pSurface = new CMemoryFrameSurface(pDC,pDirtyTable,pBmp);
+		pSurface->m_nThreadID=curThreadId;
+		pSurface->m_pScreen = m_pScreen;
+		pSurface->SetRect(pSurfaceRc);
+		return pSurface;
+	}
+	//请注意CFrameSurface必须是Thread Safe,因为绘图操作可能由不同的Thread发起，所以
+	//每个FrameSurface对每个Thread是独立的。
+	CFrameSurface* CreateNewOfflineSurface(WRect* pSurfaceRc)
+	{
+		 DWORD  curThreadId = GetCurrentThreadId();
+		TRACE("Current Thread ID = %d\n", curThreadId);
+		CDC* pDC = new CDC();
+		CBitmap* pBmp = new CBitmap();
+		CDirtyTable* pDirtyTable =new CDirtyTable(DIRTY_TABLE_SIZE);								
+		pDirtyTable->Clear();
+
+		pDC->CreateCompatibleDC(m_pScreen);
+		//m_pScreen->LPtoDP(&m_rect);
+		pBmp->CreateCompatibleBitmap(m_pScreen, pSurfaceRc->dx,pSurfaceRc->dy);
+		pDC->SelectObject(pBmp);
+		//pDC->SetWindowOrg(pSurfaceRc->x,pSurfaceRc->y);
+		pDC->SetBkMode(TRANSPARENT);			
+
+		CFrameSurface * pSurface = new CFrameSurface(pDC,pDirtyTable,pBmp);
+		pSurface->m_nThreadID=curThreadId;
+		pSurface->m_pScreen = m_pScreen;
+		pSurface->SetRect(pSurfaceRc);
+		return pSurface;
+	}
+
+	CFrameSurface* CreateFrameSurface(WRect* pSurfaceRc)
+	{
+		return GetCurrentThreadFrameSurface(false,pSurfaceRc);
+	}
+	virtual CFrameSurface* GetCurFrameSurface()
+	{
+		CFrameSurface* pSurface;
+		pSurface = GetCurrentThreadFrameSurface(true);
+		return pSurface;
+	}
+	CFrameSurface* GetCurrentThreadFrameSurface(bool bMustHave=false,WRect* pSurfaceRc=NULL)
+	{
+		 DWORD  curThreadId = GetCurrentThreadId();
+		 ::EnterCriticalSection(&m_CriticalSection);
+		CFrameSurface* pItem = (CFrameSurface*)(this->m_pHeadOfFrameSurfaces);		
+		while(pItem!=0)
+		{
+				if(pItem->m_nThreadID == curThreadId && pItem->IsPaintFinished()==false)
+				{
+					break;
+				}
+				pItem=pItem->m_pNext;			
+		}		
+		 ::LeaveCriticalSection(&m_CriticalSection);   
+
+		 if(bMustHave == false)
+		 {
+			if(pItem==NULL)
+			{
+				pItem = CreateNewOfflineSurface(pSurfaceRc);
+				AddFrameSurface(pItem);
+			}
+		}
+
+		 return pItem;
+
+	}
+
+	CFrameSurface* AddFrameSurface(CFrameSurface* pSurface)
+	{
+
+		 ::EnterCriticalSection(&m_CriticalSection);
+		if(this->m_pTailOfFrameSurfaces==0)
+		{
+			m_pTailOfFrameSurfaces=m_pHeadOfFrameSurfaces=pSurface;
+			m_pTailOfFrameSurfaces->m_pNext=NULL;
+			m_pTailOfFrameSurfaces->m_pPrev=NULL;
+		}
+		else
+		{
+			this->m_pTailOfFrameSurfaces->m_pNext=pSurface;
+			pSurface->m_pPrev=this->m_pTailOfFrameSurfaces;
+			this->m_pTailOfFrameSurfaces=pSurface;
+		}
+		::LeaveCriticalSection(&m_CriticalSection);   
+		this->m_nFrameSurfaces++;
+
+		return pSurface;
+	}
+
+
+
+	BOOL RemoveFrameSurface(CFrameSurface* pSurface)
+	{
+
+		 ::EnterCriticalSection(&m_CriticalSection);
+		CFrameSurface* pItem = (CFrameSurface*)(this->m_pHeadOfFrameSurfaces);
+		while(pItem!=0)
+		{
+			if(pItem==pSurface)
+			{
+				if(pItem->m_pPrev!=NULL)
+				{
+					pItem->m_pPrev->m_pNext=pItem->m_pNext;
+				}
+				else
+				{
+					this->m_pHeadOfFrameSurfaces=pItem->m_pNext;
+				}
+
+				if(pItem->m_pNext!=NULL)
+				{
+					pItem->m_pNext->m_pPrev=pItem->m_pPrev;
+				}
+				else
+				{
+					this->m_pTailOfFrameSurfaces=pItem->m_pPrev;
+				}		
+				this->m_nFrameSurfaces--;
+			    ::LeaveCriticalSection(&m_CriticalSection);   
+				return true;
+			}
+			pItem=pItem->m_pNext;
+
+		}
+		 ::LeaveCriticalSection(&m_CriticalSection);   
+		return false;		
+	}
+
+	/*
+	函数功能：Bitblt所有Paint Finished's的FrameSurface到屏幕位图完成显示
+	注意FrameSuface的DirtyTable 中所保存的位置为绝对位置，无需进行转换
+
+	*/
+	BOOL FlushSurface()
+	{
+		 ::EnterCriticalSection(&m_CriticalSection);
+		CFrameSurface* pItem = (CFrameSurface*)(this->m_pHeadOfFrameSurfaces);		
+		while(pItem!=0)
+		{
+			if(pItem->IsPaintFinished()==true)
+			{
+				
+				
+				SDL_Rect* pSDLRect = pItem->m_pDirtyTable->m_pHeadOfRects;
+				while(pSDLRect!=NULL)
+				{
+					
+					CDC* pMemDC = pSDLRect->pDC;
+					ASSERT(pMemDC!=NULL);
+
+					int x = pSDLRect->x;
+					int y = pSDLRect->y;
+					int sx = x;
+					int sy = y;
+					pItem->ScreenToSuface(sx,sy,pMemDC);
+					if(pSDLRect->IsPlusOffset()==true)
+					{
+						int x_offset=0;
+						int y_offset=0;
+						pItem->GetBitBltOffset(x_offset,y_offset);	
+						x+=x_offset;
+						y+=y_offset;
+					}
+					int alpha = pItem->GetAlpha();
+					if(alpha==255 && pSDLRect->nAlpha ==255)
+						//not transparent
+					{
+						m_pScreen->BitBlt(x,y,
+							pSDLRect->w,pSDLRect->h,pMemDC,sx,sy,SRCCOPY);			
+					}
+					else
+					{
+						if(pSDLRect->nAlpha<255) 
+						{
+							alpha = pSDLRect->nAlpha;
+						}
+						BLENDFUNCTION m_bf;	
+						m_bf.BlendOp = AC_SRC_OVER;
+						m_bf.BlendFlags = 0;
+						m_bf.SourceConstantAlpha = 0;
+						m_bf.AlphaFormat = 0 ;
+						m_bf.SourceConstantAlpha = alpha;
+						m_pScreen->AlphaBlend(x,y,
+							pSDLRect->w,pSDLRect->h,pMemDC,
+							sx,sy,pSDLRect->w,pSDLRect->h,m_bf);
+					}
+					pSDLRect=pSDLRect->m_pNext;
+				}
+
+		
+				CFrameSurface* pDelete =pItem;
+				
+				if(pItem->IsRemove()==TRUE)
+				{					
+					if(pItem->m_pPrev!=NULL)
+					{
+						pItem->m_pPrev->m_pNext=pItem->m_pNext;
+					}
+					else
+					{
+						this->m_pHeadOfFrameSurfaces=pItem->m_pNext;
+					}
+
+					if(pItem->m_pNext!=NULL)
+					{
+						pItem->m_pNext->m_pPrev=pItem->m_pPrev;
+					}
+					else
+					{
+						this->m_pTailOfFrameSurfaces=pItem->m_pPrev;
+					}		
+					
+					
+					this->m_nFrameSurfaces--;
+				}
+				pItem=pItem->m_pNext;
+
+				//如果不是MemorySurface则直接将其销毁,否则保留，因为
+				//MemorySurface一般是动画用的，下次动画可能还要用,留给
+				//AnimateEngine to destroy
+				if( pDelete->IsDestroy()==true)
+				{
+					delete pDelete;
+				}					
+
+			}
+			else
+			{
+				pItem=pItem->m_pNext;
+			}
+
+		}
+		 ::LeaveCriticalSection(&m_CriticalSection);   
+		return false;		
+	}

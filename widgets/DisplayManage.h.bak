@@ -1,0 +1,654 @@
+/*************************************************************************
+Easy-Go Server 
+Author: Sureone Yang
+Email: EasyGo_Owner@yahoo.com
+------------------------------------------
+Revision History:
+2007-11-10			
+	V0.1 BaseLine
+2007-11-11			
+	1.  Add a new feature for supporting transparent wiget
+2007-11-17
+	1.  Add a animate engine in charge of the animation management.
+	2.  增加了一个CFrameSurface, 该Surface只是个内存影像,每次绘图之前即(BeginPaint)须
+		Create 一个FrameSurface,当绘图结束时候即(EndPaint)再将该FrameSurface添加到MyCDC管
+		理的FrameSurface列表。然后由AnimateEngine每隔一定的时间将FrameSurface列表BitBlt到
+		实际的屏幕CDC中，完成绘图的显示。
+		请注意CFrameSurface必须是Thread Safe,因为绘图操作可能由不同的Thread发起，所以
+		每个FrameSurface对每个Thread是独立的。
+	3. 将所有的绘图操作函数全部转移到CFrameSurface类中实现
+	4. Add FlushSurface 函数，将所有Paint Finished's的FrameSurface到屏幕位图完成显示,注意
+	    FrameSuface的DirtyTable 中所保存的位置为绝对位置，无需进行转换
+
+2007-11-18 - New Feature " Apple Style UI "
+	1. 动画效果的三要素，时间，位图，动作，位图在指定的时间内完成指定的动作。
+	2. 动作，是指对位图做特定的变幻效果，如移动(MOVE)，翻转(FLIP)，消隐(ALPHA)，缩放(ZOOM),等，变幻
+		将位图绘制到屏幕中。
+	3. 位图，位图是指特定区域内的屏幕映像，生成动画之前将所有需要的Widget在CMemoryFrameSurface中绘
+		制好，然后将CMemoryFrameSurface转换为位图
+	2. 增加一个CMemoryFrameSurface，处理在memory 位图
+
+*************************************************************************/
+#pragma once
+#include "common.h"
+#include <stdlib.h>
+
+
+#define USE_CDC
+#define DISABLE_RECT_MERGE
+#define USE_INDEP_DIB
+//#define USE_CXIMAGE
+#ifdef USE_SDL
+#include "SDL.h"
+#include "SDL_image.h"
+#include "SDL_draw.h"
+#include "SDL_ttf.h"
+#else
+
+enum{
+	MODE_GENERAL,
+	MODE_XOR,
+};
+
+
+#endif
+
+
+
+#ifdef USE_CDC
+#include <afxwin.h>
+#endif
+
+#ifdef USE_CXIMAGE
+#include "ximage.h"
+#endif
+#define WRECT_TO_SDLRECT(SRC,DEST) \
+	(DEST).x=(SRC).x; \
+	(DEST).y=(SRC).y; \
+	(DEST).w=(SRC).dx; \
+	(DEST).h=(SRC).dy;
+
+#define DIRTY_TABLE_SIZE 100
+/* Approximate worth of one dirtyrect in pixels. */
+#define	PIG_WORST_MERGE		300
+
+/*
+ * If the merged result gets at most this many percent
+ * bigger than the larger of the two input rects,
+ * accept it as Perfect.
+ */
+#define	PIG_INSTANT_MERGE	10
+class SDL_Rect
+{
+public:
+	SDL_Rect()
+	{
+		m_pNext=NULL;
+		m_pPrev=NULL;
+		m_bPlusOffset=false;
+
+	}
+	int x;
+	int y;
+	int w;
+	int h;
+	int nAlpha;
+	CDC* pDC;
+	SDL_Rect* m_pNext;
+	SDL_Rect* m_pPrev;
+	bool m_bPlusOffset;
+	bool IsPlusOffset()
+	{
+		return m_bPlusOffset;
+	}
+};
+class CDirtyTable
+{
+public:
+	int		size;	/* Table size */
+	int		count;	/* # of rects currently used */
+	int		best;	/* Merge testing starts here! */
+	SDL_Rect* m_pHeadOfRects;
+	SDL_Rect* m_pTailOfRects;
+
+	CDirtyTable(int table_size)
+	{
+			size = table_size;
+			count = 0;
+			best = 0;
+			m_pHeadOfRects=0;
+			m_pTailOfRects=0;
+
+	};
+	~CDirtyTable()
+	{
+		Clear();
+	}
+
+	void Clear()
+	{
+		SDL_Rect* pItem = (SDL_Rect*)(this->m_pHeadOfRects);
+		while(pItem!=0)
+		{
+			SDL_Rect* pDelete = pItem;
+			pItem=pItem->m_pNext;
+			delete pDelete;
+
+		}
+		m_pHeadOfRects=NULL;
+		m_pTailOfRects=NULL;
+		count=0;
+		best=0;
+	}
+	int GetCount()
+	{
+		return count;
+	}
+
+	void AddToHead(SDL_Rect* dr)
+	{
+		if(this->m_pHeadOfRects ==NULL)
+		{
+			m_pTailOfRects=dr;
+		}
+		else
+		{
+			m_pHeadOfRects->m_pPrev=dr;
+			dr->m_pNext=m_pHeadOfRects;
+
+		}
+		m_pHeadOfRects = dr;
+	}
+	void Add(SDL_Rect* dr)
+	{
+
+		if(this->m_pTailOfRects==0)
+		{
+			m_pTailOfRects=m_pHeadOfRects=dr;
+			m_pTailOfRects->m_pNext=NULL;
+			m_pTailOfRects->m_pPrev=NULL;
+		}
+		else
+		{
+			this->m_pTailOfRects->m_pNext=dr;
+			dr->m_pPrev=this->m_pTailOfRects;
+			this->m_pTailOfRects=dr;
+		}
+		this->count++;
+	}
+
+
+
+	BOOL Remove(SDL_Rect* dr)
+	{
+
+		SDL_Rect* pItem = (SDL_Rect*)(this->m_pHeadOfRects);
+		while(pItem!=0)
+		{
+			if(pItem==dr)
+			{
+				if(pItem->m_pPrev!=NULL)
+				{
+					pItem->m_pPrev->m_pNext=pItem->m_pNext;
+				}
+				else
+				{
+					this->m_pHeadOfRects=pItem->m_pNext;
+				}
+
+				if(pItem->m_pNext!=NULL)
+				{
+					pItem->m_pNext->m_pPrev=pItem->m_pPrev;
+				}
+				else
+				{
+					this->m_pTailOfRects=pItem->m_pPrev;
+				}		
+				this->count--;
+
+				return true;
+			}
+			pItem=pItem->m_pNext;
+
+		}
+		return false;		
+	}
+	void MergeRect(SDL_Rect *from, SDL_Rect *to)
+	{
+		int x1 = from->x;
+		int y1 = from->y;
+		int x2 = from->x + from->w;
+		int y2 = from->y + from->h;
+		if(to->x < x1)
+			x1 = to->x;
+		if(to->y < y1)
+			y1 = to->y;
+		if(to->x + to->w > x2)
+			x2 = to->x + to->w;
+		if(to->y + to->h > y2)
+			y2 = to->y + to->h;
+		to->x = x1;
+		to->y = y1;
+		to->w = x2 - x1;
+		to->h = y2 - y1;
+	}
+
+	void IntersectRect(SDL_Rect *from, SDL_Rect *to)
+	{
+		int Amin, Amax, Bmin, Bmax;
+		Amin = to->x;
+		Amax = Amin + to->w;
+		Bmin = from->x;
+		Bmax = Bmin + from->w;
+		if(Bmin > Amin)
+			Amin = Bmin;
+		to->x = Amin;
+		if(Bmax < Amax)
+			Amax = Bmax;
+		to->w = Amax - Amin > 0 ? Amax - Amin : 0;
+
+		Amin = to->y;
+		Amax = Amin + to->h;
+		Bmin = from->y;
+		Bmax = Bmin + from->h;
+		if(Bmin > Amin)
+			Amin = Bmin;
+		to->y = Amin;
+		if(Bmax < Amax)
+			Amax = Bmax;
+		to->h = Amax - Amin > 0 ? Amax - Amin : 0;
+	}
+
+
+
+
+
+} ;
+
+
+
+
+
+
+
+
+typedef void* IMAGE_HANDLE;
+
+class CWidgetResource
+{
+public:
+	CWidgetResource()
+	{
+		
+	}
+	CWidgetResource(char* id,void* res)
+	{
+		strcpy(res_id,id);
+		resource=res;
+		bmp_mask1=NULL;
+		bmp_mask2=NULL;
+	}
+	BOOL isMe(char* id)
+	{
+		if(strcmp(id,res_id)==0) return TRUE;
+		return FALSE;
+	}
+	char res_id[256];
+	void* resource;
+	void* bmp_mask1;
+	void * bmp_mask2;
+	int total_imgs;
+	int w;
+	int h;
+	virtual ~CWidgetResource();
+};
+class MyCDC;
+class CMemBitmap;
+
+
+
+	
+
+
+class CMemBitmap
+{
+public:
+	void * bitmap_data;
+	WRect m_rect;
+	int m_nAlphaValue;
+#ifdef USE_CDC
+	CDC* m_pCDC;
+#endif
+	CMemBitmap* pNext;
+
+	CMemBitmap(){
+		bitmap_data=0;
+		m_pCDC=0;
+		m_rect.dx=m_rect.dy=0;
+
+		CBitmap* bmp= new CBitmap();
+		m_pCDC= new CDC();
+		bitmap_data=bmp;
+		m_nAlphaValue=255;
+		pNext=NULL;
+		
+	};
+
+	void SetAlpha(int v)
+	{
+		m_nAlphaValue=v;
+	}
+
+	~CMemBitmap(){
+		
+		CBitmap* bmp=(CBitmap*)bitmap_data;
+		
+		bmp->DeleteObject();
+		m_pCDC->DeleteDC();
+		delete bmp;
+		delete m_pCDC;
+
+		if(pNext!=NULL)
+		{
+			delete pNext;
+		}
+	};
+};
+
+class CFrameSurface{
+public:
+	CFrameSurface(CDC* pDC,CDirtyTable* dirtyTable,CBitmap* pBmp);
+	virtual ~CFrameSurface();
+	virtual bool GetBackupScreen(CDC* &pDC,WRect* pRect);
+	virtual CDC* BackUpScreen(WRect* pRect, bool& bBackuped);
+
+	virtual void RemoveBackGroundDirtyRect();
+	virtual void AddDirtyRect(WRect* pRect,int nAlpha=-1,CDC* pDC=NULL,bool bHead=false,bool bPlusOffset=true);
+
+	virtual void BeginPaint()
+	{
+		m_bFinishPaint=false;
+	}
+	
+	virtual void EndPaint()
+	{
+		m_bFinishPaint=true;
+		m_bDestroy=true;
+		m_bRemove=true;
+	}
+	virtual bool IsPaintFinished()
+	{
+		return m_bFinishPaint;
+	}
+	CDirtyTable*  m_pDirtyTable;
+	CDC* m_pCDC;
+	CBitmap* m_pBitmap;
+	CFrameSurface* m_pNext;
+	CFrameSurface* m_pPrev;
+	DWORD m_nThreadID;
+	bool m_bFinishPaint;
+	WRect	m_clipRect;
+	WRect m_rect;
+	CMemBitmap* m_pCurMemBitmap;
+
+	CBitmap* m_pBmpScreenBackup;
+	CDC* m_pCDCScreenBackup;
+	WRect m_rcScreenBackUp;
+	
+	WPoint ptOld;
+
+	virtual void SetRect(WRect* pRc)
+	{
+		CLONE_RECT(pRc,(&m_rect));
+
+	}
+
+	virtual void GetRect(WRect* pRc)
+	{
+		CLONE_RECT((&m_rect),pRc);
+	}
+
+	virtual void DrawImage(IMAGE_HANDLE handle,
+		WRect* pFullImageRect,
+		bool reverse,
+		char* batch_bmp_draw_cmd);
+	
+	virtual void DrawImage(IMAGE_HANDLE handle,
+		WRect* pFullImageRect,
+		WRect* clipRc,
+		bool bTransparent=false,
+		bool reverse=false,
+		int x=0,
+		int y=0, 
+		int w=-1,
+		int h=-1);
+
+	virtual void DrawText(LPCTSTR lpString,   // address of string to draw
+                       int     nCount,     // string length, in characters
+                       WRect* pRc,     // address of structure with formatting dimensions
+                       UINT    uFormat     // text-drawing flags
+					   );
+
+	virtual CMemBitmap* NewMemBitmap ( int w,int h);
+
+	virtual CMemBitmap* GetMemBitmap(WRect* pRect);
+
+	virtual void BitBlt(CMemBitmap* pMemBmp,WRect* rcDraw);
+
+	virtual CDC* GetScreenCDC ( );
+
+	int m_nAlpha;
+	virtual void SetAlpha(int nAlpha)
+	{
+		m_nAlpha=nAlpha;
+	}
+	virtual int GetAlpha()
+	{
+		return m_nAlpha;
+	}
+
+
+	CDC* m_pMemoryDrawCDC;
+	CBitmap* m_pMemoryDrawBitmap;
+	bool m_bMemoryDraw;
+	virtual void BeginDrawInMemory();
+	virtual void EndDrawInMemory();
+
+	virtual void GetClipRect(  WRect* rc);
+	virtual void SetClipRect( WRect* rc);
+
+	virtual int MoveTo( int x, int y);
+	virtual int LineTo(  int x, int y,int color);
+	virtual int FillRect(  WRect* pRect, int color);
+	virtual int DrawRectangle(WRect* pRect,int color)
+	{
+
+		//pDC->Rectangle(pRect->x,pRect->y,pRect->x+pRect->dx,pRect->y+pRect->dy);
+		MoveTo(pRect->x,pRect->y);
+		LineTo(pRect->x,pRect->y+pRect->dy,color);
+		LineTo(pRect->x+pRect->dx,pRect->y+pRect->dy,color);
+		LineTo(pRect->x+pRect->dx,pRect->y,color);
+		LineTo(pRect->x,pRect->y,color);
+
+		return 0;
+	}
+
+	virtual int DrawLine(int x1, int y1, int x2, int y2)
+	{
+
+		MoveTo(x1,y1);
+		LineTo(x2,y2,0x555555);
+
+		return 0;
+	}
+
+	bool m_bOffScreenDraw;
+	CDC* m_pScreen;
+	bool m_bMemorySurface;
+	virtual bool IsMemorySurface()
+	{
+		return m_bMemorySurface;
+	}
+
+	int m_nBitBltXOffset;
+	int m_nBitBltYOffset;
+	virtual void GetBitBltOffset(int& x, int& y)
+	{
+		x= m_nBitBltXOffset;
+		y = m_nBitBltYOffset;
+	}
+	virtual void SetBitBltOffset(int x, int y)
+	{
+		m_nBitBltXOffset=x;
+		m_nBitBltYOffset=y;
+
+	}
+
+	virtual void SetPainFinish(bool flag)
+	{
+		m_bFinishPaint=flag;		
+	}
+	virtual bool IsRemove()
+	{
+		return m_bRemove;
+	}
+	bool m_bDestroy;
+	bool m_bRemove;
+	virtual bool IsDestroy()
+	{
+		return m_bDestroy;
+	}
+
+	virtual void SetRemoveFlag(bool flag)
+	{
+		m_bRemove=flag;
+	}
+	virtual void SetDestroyFlag(bool flag)
+	{
+		m_bDestroy=flag;
+	}
+
+	virtual void ScreenToSuface(WRect* pRect,CDC* pDC)
+	{
+		if(pDC==this->m_pCDC)
+		{
+			pRect->x-=m_rect.x;
+			pRect->y-=m_rect.y;
+		}
+		if(pDC==this->m_pCDCScreenBackup )
+		{
+			pRect->x-=this->m_rcScreenBackUp.x;
+			pRect->y-=this->m_rcScreenBackUp.y;
+
+		}
+	}
+	virtual void ScreenToSuface(int& x, int& y,CDC* pDC)
+	{
+		if(pDC==this->m_pCDC)
+		{
+			x-=m_rect.x;
+			y-=m_rect.y;
+		}
+		if(pDC==this->m_pCDCScreenBackup )
+		{
+			x-=this->m_rcScreenBackUp.x;
+			y-=this->m_rcScreenBackUp.y;
+
+		}
+	}
+};
+
+class CMemoryFrameSurface:
+	public CFrameSurface
+{
+public:
+	CMemoryFrameSurface(CDC* pDC,CDirtyTable* dirtyTable,CBitmap* pBmp):
+	  CFrameSurface(pDC,dirtyTable,pBmp)
+	{
+		m_bMemorySurface=true;
+	};
+	virtual ~CMemoryFrameSurface()
+	{
+	};
+	virtual void BeginPaint()
+	{
+		m_bFinishPaint=false;
+	}
+	
+	virtual void EndPaint()
+	{
+		SetPainFinish(false);
+		SetRemoveFlag(false);
+		SetDestroyFlag(false);
+	}
+
+};
+//Add CWidget Interface,
+class CWidgetDisplayInterface{
+public:
+	virtual void InvalidateScreenRectFromDisplay(WRect* pRect, bool bErase=true)=0;
+};
+class CDisplayManage: public CWidgetDisplayInterface
+{
+public:
+
+
+	CWidgetDisplayInterface* m_pRootContainer;
+
+	void RegisterRootContainer(CWidgetDisplayInterface* pRootConatiner)
+	{
+		ASSERT(pRootConatiner!=NULL);
+		m_pRootContainer = pRootConatiner;
+	}
+	void InvalidateScreenRectFromDisplay(WRect* pRect, bool bErase=true)
+	{
+		m_pRootContainer->InvalidateScreenRectFromDisplay(pRect,bErase);
+
+	}
+	CDC* m_pScreen;
+	CDC* m_pBuffer;
+
+	std::vector<CWidgetResource*> resource_db;
+
+	CFont m_font;
+
+	CWidgetResource* AddResource(char* res_id,void* resource,void* bmpMask1,void* bmpMask2);
+	CWidgetResource* GetResource(char* res_id);
+	
+	IMAGE_HANDLE LoadImage ( char* fn,char* draw_cmd);
+
+	void GetClipRect(  WRect* rc);
+	void SetClipRect( WRect* rc);
+
+
+	int Init(  int w,int h);
+	virtual CFrameSurface* BeginPaint(WRect* pPaintRc);
+	virtual void EndPaint( CFrameSurface* pSurface );
+
+	virtual CMemoryFrameSurface* BeginMemoryPaint(WRect* pPaintRc);
+	virtual void EndMemoryPaint( CMemoryFrameSurface* pSurface );
+	WRect m_clipRect;
+
+	char* m_pDefaultFont;
+
+
+	CFrameSurface* m_pHeadOfFrameSurfaces;
+	CFrameSurface* m_pTailOfFrameSurfaces;
+	int m_nFrameSurfaces;
+	CRITICAL_SECTION m_CriticalSection;
+
+public:
+	CDisplayManage(void);
+	CDisplayManage(HWND hWnd);
+	~CDisplayManage(void);
+
+
+
+};
+
+/**************
+API For Animate Engine
+**************/
+void RefreshScreenSurface();
+void DisplayAddSurface(CFrameSurface* pSurface);
+
