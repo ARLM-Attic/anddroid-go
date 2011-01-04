@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="leave">退出</string>
+    <string name="dianmu">点目</string>
+    <string name="giveup">认输</string>
+    <string name="pass">Pass</string>
+    <string name="start">开始</string>
+    <string name="password">密码</string>
+    <string name="email">邮箱</string>
+    <string name="acount">帐号</string>
+    <string name="register">注册</string>
+    <string name="login">登录</string>
+    <string name="hello">Hello World, main!</string>
+    <string name="app_name">goapp</string>
+    <string name="dianmuReq">对方要求点目,是否同意?</string>
+    <string name="dianmuResult">点目结果:</string>
+    <string name="black">黑</string>
+    <string name="white">白</string>
+    <string name="win">胜</string>
+    <string name="ping">平</string>
+    <string name="agree">同意</string>
+    <string name="reject">拒绝</string>
+    <string name="xia">下</string>
+    <string name="jointimeout">太长时间未开始游戏\n请按返回重新加入游戏.</string>
+    <string name="join">加入</string>    
+    <string name="loginfail">登录失败，请检查帐号或密码</string>
+    <string name="registerfail">注册失败，可能帐号已被用</string>
+    <string name="isready">准备好了</string>
+    <string name="gamestart">游戏开始</string>
+    <string name="acc_pin_null">帐号或密码不能为空</string>
+    <string name="refresh">刷新</string>
+    <string name="go">围棋</string>
+    <string name="joingame">加入游戏</string>
+    <string name="waitingforlogin">请稍等...\n正在登录到服务器</string>
+    <string name="waitingforregister">请稍等...\n正在注册到服务器</string>
+    <string name="waitingforjoin">请稍等...\n正在加入游戏</string>
+    
+</resources>

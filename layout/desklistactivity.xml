@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/backLayout"
+  android:layout_height="fill_parent" android:layout_width="fill_parent">
+<RelativeLayout
+android:id="@+id/listLayout"
+android:layout_width="fill_parent"
+android:layout_height="wrap_content"
+xmlns:android="http://schemas.android.com/apk/res/android"
+>
+<Button
+android:id="@+id/txtListTitle"
+android:layout_width="fill_parent"
+android:layout_height="wrap_content"
+android:text="列表"
+android:layout_alignParentTop="true"
+>
+</Button>  
+<GridView android:id="@+id/DeskListView"
+android:layout_below="@+id/txtListTitle" 
+android:layout_width="fill_parent" android:layout_height="wrap_content"></GridView>
+</RelativeLayout>
+</LinearLayout>

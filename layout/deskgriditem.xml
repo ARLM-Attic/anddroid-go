@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+android:id="@+id/itemLayout"
+android:layout_width="fill_parent"
+android:layout_height="wrap_content"
+xmlns:android="http://schemas.android.com/apk/res/android"
+>
+<ImageView android:id="@+id/BlackItemImage" 
+android:layout_width="wrap_content" 
+android:layout_alignParentLeft="true"
+android:layout_alignParentTop="true"
+android:layout_height="wrap_content">
+</ImageView>
+<ImageView android:id="@+id/WhiteItemImage" 
+android:layout_width="wrap_content" 
+android:layout_alignParentLeft="true"
+android:layout_below="@+id/BlackItemImage"
+android:layout_height="wrap_content">
+</ImageView>
+<TextView
+android:id="@+id/txtBlackItem"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="NULL"
+android:layout_alignParentTop="true"
+android:layout_toRightOf="@+id/BlackItemImage"
+>
+</TextView>
+<TextView
+android:id="@+id/txtWhiteItem"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="NULL"
+android:layout_alignParentTop="true"
+android:layout_alignParentRight="true"
+>
+</TextView>
+</RelativeLayout>
+

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+android:id="@+id/backLayout"
+android:layout_width="fill_parent"
+android:layout_height="fill_parent"
+android:orientation="vertical"
+xmlns:android="http://schemas.android.com/apk/res/android"
+>
+<RelativeLayout
+android:id="@+id/boardLayout"
+android:layout_width="fill_parent"
+android:layout_height="wrap_content"
+android:layout_alignParentTop="true"
+xmlns:android="http://schemas.android.com/apk/res/android"
+>
+	<RelativeLayout
+	android:id="@+id/blackLayout"
+	android:layout_width="wrap_content"
+	android:layout_height="wrap_content"
+	android:layout_alignParentTop="true"
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	>
+		<ImageView android:id="@+id/BlackImage" 
+		android:layout_width="wrap_content" 
+		android:layout_alignParentTop="true"
+		android:layout_alignParentLeft="true"
+		android:layout_height="wrap_content">
+		</ImageView>	
+		<TextView
+		android:id="@+id/txtBlack"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="NULL"
+		android:layout_alignParentTop="true"		
+		android:layout_toRightOf="@+id/BlackImage"
+		>
+		</TextView>
+
+	</RelativeLayout>
+	<RelativeLayout
+	android:id="@+id/whiteLayout"
+	android:layout_width="wrap_content"
+	android:layout_height="wrap_content"
+	android:layout_alignParentTop="true"
+	android:layout_alignParentRight="true"
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	>
+		<ImageView android:id="@+id/WhiteImage" 
+		android:layout_width="wrap_content" 
+		
+		android:layout_alignParentRight="true"
+		android:layout_alignParentTop="true"
+		android:layout_height="wrap_content">
+		</ImageView>	
+		<TextView
+		android:id="@+id/txtWhite"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="NULL"
+		android:layout_alignParentTop="true"
+		android:layout_toLeftOf="@+id/WhiteImage"
+		>
+		</TextView>
+
+	</RelativeLayout>
+		<TextView
+		android:id="@+id/txtCenter"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="TextView"
+		android:layout_centerHorizontal="true"
+		android:layout_alignParentTop="true"
+		>
+		</TextView>
+		<TextView
+		android:id="@+id/txtInfo"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="TextView"
+		android:layout_above="@+id/btnStart"
+		android:layout_alignParentLeft="true"
+		>	
+		</TextView>	
+		<Button
+		android:id="@+id/btnStart"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_alignParentBottom="true"
+		android:layout_alignParentLeft="true"
+		android:text="@string/start">
+		</Button>
+		<Button
+		android:id="@+id/btnPass"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/pass"
+		android:layout_alignParentBottom="true"
+		android:layout_toRightOf="@+id/btnStart"
+		>
+		</Button>
+		<Button
+		android:id="@+id/btnDianMu"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/dianmu"
+		android:layout_alignParentBottom="true"
+		android:layout_toRightOf="@+id/btnPass"
+		>
+		</Button>
+		<Button
+		android:id="@+id/btnGiveUp"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/giveup"
+		android:layout_alignParentBottom="true"
+		android:layout_toRightOf="@+id/btnDianMu"
+		>
+		</Button>
+</RelativeLayout>
+</LinearLayout>
